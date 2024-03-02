@@ -2,7 +2,7 @@ import torch
 import itertools
 import pyter
 from nltk.translate.bleu_score import SmoothingFunction, corpus_bleu, sentence_bleu
-from datasets import load_dataset
+from datasets import Dataset
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -26,11 +26,12 @@ class Llama_Tuner():
         
         dataset = []
         for i in range(len(instruction)):
-            item = {}
-            item['text'] = "<s>[INST] " + str(instruction[i]) + " [/INST] " + str(response[i]) + " </s>"
+            item = "<s>[INST] " + str(instruction[i]) + " [/INST] " + str(response[i]) + " </s>"
             dataset.append(item)
         
-        return iter(dataset)
+        dataset = {'text': dataset}
+        dataset = Dataset.from_dict(dataset)
+        return dataset
     
     def load_model(self, model_name: str, quant_config: dict, lora_config: dict, train_config: dict):
         self.model_name = model_name

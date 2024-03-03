@@ -33,7 +33,7 @@ class Llama_Tuner():
         dataset = Dataset.from_dict(dataset)
         return dataset
     
-    def load_model(self, model_name: str, quant_config: dict, lora_config: dict, train_config: dict):
+    def load_model(self, model_name: str, quant_config: dict, lora_config: dict, train_config: dict, ret: bool = False):
         self.model_name = model_name
         quant_config = BitsAndBytesConfig(
             load_in_4bit = quant_config['load_in_4bit'],
@@ -76,27 +76,36 @@ class Llama_Tuner():
             warmup_ratio = train_config['warmup_ratio'],
             group_by_length = train_config['group_by_length'],
             lr_scheduler_type = train_config['lr_scheduler_type'],
-            report_to = train_config['report_to']
+            report_to = train_config['report_to'],
+            remove_unused_columns = train_config['remove_unused_columns']
         )
     
     def tune_and_save(self, train_dataset, save_name: str):
         self.save_name = save_name
 
-        llama_tokenizer = AutoTokenizer.from_pretrained(self.model_name, trust_remote_code=True)
-        llama_tokenizer.pad_token = llama_tokenizer.eos_token
-        llama_tokenizer.padding_side = "right"
+        self.llama_tokenizer = AutoTokenizer.from_pretrained(self.model_name, trust_remote_code=True)
+        self.llama_tokenizer.pad_token = self.llama_tokenizer.eos_token
+        self.llama_tokenizer.padding_side = "right"
 
         self.tuner = SFTTrainer(
             model = self.base_model,
             train_dataset = train_dataset,
             peft_config = self.peft_parameters,
             dataset_text_field = "text",
-            tokenizer = llama_tokenizer,
-            args = self.train_params
+            max_seq_length = None,
+            tokenizer = self.llama_tokenizer,
+            args = self.train_params,
+            packing=False
         )
 
         self.tuner.train()
         self.tuner.model.save_pretrained(save_name)
+        self.tuner.tokenizer.save_pretrained(save_name)
+
+    def generate_base_text(self, query: str):
+        text_gen = pipeline(task="text-generation", model=self.base_model, tokenizer=self.llama_tokenizer, max_length=200)
+        output = text_gen(f"<s>[INST] {query} [/INST]")
+        return output[0]['generated_text']
 
     def generate_text(self, query: str, use_trained_model: bool = True, model_name: str = None):
         if not use_trained_model:
@@ -105,11 +114,9 @@ class Llama_Tuner():
             else:
                 gen_model = model_name
         else:
-            gen_model = self.save_name
+            gen_model = self.tuner.model
         
-        llama_tokenizer = AutoTokenizer.from_pretrained(self.model_name, trust_remote_code=True)
-        
-        text_gen = pipeline(task="text-generation", model=gen_model, tokenizer=llama_tokenizer, max_length=200)
+        text_gen = pipeline(task="text-generation", model=gen_model, tokenizer=self.llama_tokenizer, max_length=200)
         output = text_gen(f"<s>[INST] {query} [/INST]")
         return output[0]['generated_text']
     

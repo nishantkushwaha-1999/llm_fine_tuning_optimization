@@ -56,7 +56,7 @@ class Llama_Tuner():
             lora_dropout = lora_config['lora_dropout'],
             r = lora_config['r'],
             bias = lora_config['bias'],
-            task_type = lora_config['task_type']
+            task_type = lora_config['task_type'],
             target_modules = lora_config['target_modules']
         )
 

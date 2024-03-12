@@ -57,6 +57,7 @@ class Llama_Tuner():
             r = lora_config['r'],
             bias = lora_config['bias'],
             task_type = lora_config['task_type']
+            target_modules = lora_config['target_modules']
         )
 
         self.train_params = TrainingArguments(
